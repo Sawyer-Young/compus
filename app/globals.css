@@ -13,3 +13,11 @@
 .sidebar-divider{height:1px;min-height:1px;flex:0 0 1px;background:var(--line);margin:18px 0 12px}
 @media(max-width:760px){.student-layout .sidebar{overflow-x:auto;overflow-y:hidden;height:auto;min-height:0}.student-layout .sidebar .nav{height:38px;min-height:38px;padding:9px 12px;font-size:11px;line-height:20px}.sidebar-divider{width:1px;height:24px;min-height:24px;flex:0 0 1px;align-self:center;margin:0 7px}}
 
+/* Shared sidebar geometry across feeds, profile, circles and messages. */
+html{scrollbar-gutter:stable}
+.student-layout{--sidebar-width:225px;--sidebar-top:114px;grid-template-columns:var(--sidebar-width) minmax(0,1fr) 288px}
+.student-layout.messaging-layout{grid-template-columns:var(--sidebar-width) minmax(0,1fr)}
+.student-layout>.sidebar{width:var(--sidebar-width);min-width:var(--sidebar-width);max-width:var(--sidebar-width);top:var(--sidebar-top);min-height:calc(100dvh - var(--sidebar-top) - 34px)}
+.student-layout>main{min-width:0}
+@media(max-width:1150px){.student-layout{--sidebar-width:190px;--sidebar-top:107px;grid-template-columns:var(--sidebar-width) minmax(0,1fr)}.student-layout.messaging-layout{grid-template-columns:var(--sidebar-width) minmax(0,1fr)}}
+@media(max-width:760px){.student-layout,.student-layout.messaging-layout{grid-template-columns:minmax(0,1fr)}.student-layout>.sidebar{width:100%;min-width:0;max-width:100%;height:54px;min-height:54px;max-height:54px;align-items:flex-start;overflow-x:auto;overflow-y:hidden}.student-layout .sidebar .nav{width:104px;min-width:104px;max-width:104px;flex:0 0 104px;height:38px;min-height:38px;max-height:38px;white-space:nowrap;margin-bottom:0}.student-layout .sidebar-divider{align-self:flex-start;margin-top:7px}}
