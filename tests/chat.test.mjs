@@ -1,0 +1,53 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync,readdirSync} from 'node:fs';
+import {chatRequest} from '../lib/chat-service.mjs';
+function setup(){const sql=new DatabaseSync(':memory:');for(const name of readdirSync('drizzle').filter(n=>n.endsWith('.sql')).sort())sql.exec(readFileSync('drizzle/'+name,'utf8'));
+ for(const [id,name] of [['a','小林'],['b','小陈'],['c','小周']])sql.prepare('INSERT INTO profiles VALUES(?,?,?,?,?)').run(id,name,'测试大学','',1);
+ const db={prepare(query){let args=[];return{bind(...values){args=values;return this},async first(){return sql.prepare(query).get(...args)||null},async all(){return{results:sql.prepare(query).all(...args)}},async run(){const r=sql.prepare(query).run(...args);return{meta:{changes:Number(r.changes)}}}}},async batch(items){sql.exec('BEGIN');try{const results=[];for(const item of items)results.push(await item.run());sql.exec('COMMIT');return results}catch(e){sql.exec('ROLLBACK');throw e}}};
+ async function call(user,data,path=''){const req=new Request('https://community.test/api/chat'+path,data?{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://community.test'},body:JSON.stringify(data)}:undefined);const r=await chatRequest(req,db,user);return{status:r.status,body:await r.json()}};
+ return{call,sql,db};}
+test('private messages: stable pair, unread counts, participant-only reads and writes',async()=>{const {call,sql}=setup();try{
+ assert.equal((await call(null)).status,401);assert.equal((await call('unregistered')).status,403);
+ const dm=await call('a',{action:'dm',to:'b'});assert.equal(dm.status,200);const id=dm.body.id;
+ assert.equal((await call('b',{action:'dm',to:'a'})).body.id,id);
+ assert.equal((await call('a',{action:'message',room:id,body:'只有双方可见'})).status,200);
+ assert.equal((await call('c',null,'?room='+id)).status,403);
+ assert.equal((await call('c',{action:'message',room:id,body:'越权'})).status,403);
+ assert.equal((await call('c',{action:'join',room:id})).status,403);
+ assert.equal((await call('c')).body.rooms.length,0);
+ assert.equal((await call('b')).body.rooms[0].unread,1);
+ const detail=(await call('b',null,'?room='+id)).body;assert.equal(detail.messages[0].body,'只有双方可见');
+ await call('b',{action:'read',room:id,seq:detail.messages[0].seq});assert.equal((await call('b')).body.rooms[0].unread,0);
+ assert.equal((await call('a',{action:'dm',to:'a'})).status,400);
+ }finally{sql.close()}});
+test('circles: create/join/chat, owner management, leave/rejoin and forbidden access',async()=>{const {call,sql}=setup();try{
+ const created=await call('a',{action:'create',name:'北区代取快递',category:'快递代取',description:'每晚八点集中取件'});assert.equal(created.status,200);const id=created.body.id;
+ assert.equal((await call('b',null,'?room='+id)).status,403);
+ assert.equal((await call('b')).body.circles[0].description,'每晚八点集中取件');
+ await call('b',{action:'join',room:id});await call('b',{action:'join',room:id});
+ assert.equal((await call('a',null,'?room='+id)).body.members.length,2);
+ assert.equal((await call('b',{action:'message',room:id,body:'请帮忙取一下快递'})).status,200);
+ assert.equal((await call('a')).body.rooms[0].unread,1);
+ assert.equal((await call('c',null,'?room='+id)).status,403);
+ assert.equal((await call('b',{action:'update',room:id,name:'篡改'})).status,403);
+ assert.equal((await call('b',{action:'remove',room:id,user:'a'})).status,403);
+ assert.equal((await call('a',{action:'leave',room:id})).status,403);
+ assert.equal((await call('a',{action:'update',room:id,name:'山姆拼单',description:'周末一起拼单'})).status,200);
+ await call('b',{action:'leave',room:id});assert.equal((await call('b',{action:'message',room:id,body:'退出后发送'})).status,403);
+ await call('b',{action:'join',room:id});assert.equal((await call('b',null,'?room='+id)).body.messages.length,1);
+ await call('a',{action:'remove',room:id,user:'b'});assert.equal((await call('b',null,'?room='+id)).status,403);
+ assert.equal((await call('a',{action:'remove',room:id,user:'a'})).status,400);
+ }finally{sql.close()}});
+test('messages: bounded history and read cursors, rate limit and origin validation',async()=>{const {call,sql,db}=setup();try{
+ const id=(await call('a',{action:'dm',to:'b'})).body.id;
+ for(let i=0;i<65;i++)sql.prepare('INSERT INTO messages(room,sender,body,created) VALUES(?,?,?,?)').run(id,'a','历史消息'+i,100+i);
+ const first=(await call('b',null,'?room='+id)).body;assert.equal(first.messages.length,60);assert.equal(first.messages[0].body,'历史消息5');
+ const older=(await call('b',null,'?room='+id+'&before='+first.messages[0].seq)).body;assert.equal(older.messages.length,5);
+ await call('b',{action:'read',room:id,seq:999999});assert.equal((await call('b')).body.rooms[0].unread,0);
+ assert.equal((await call('b',{action:'message',room:id,body:'   '})).status,400);
+ for(let i=0;i<30;i++)sql.prepare('INSERT INTO messages(room,sender,body,created) VALUES(?,?,?,?)').run(id,'b','频繁消息',Date.now());
+ assert.equal((await call('b',{action:'message',room:id,body:'下一条'})).status,429);
+ const bad=new Request('https://community.test/api/chat',{method:'POST',headers:{Origin:'https://other.test'},body:JSON.stringify({action:'dm',to:'c'})});assert.equal((await chatRequest(bad,db,'a')).status,403);
+ }finally{sql.close()}});
