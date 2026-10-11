@@ -51,3 +51,19 @@ Node.js >=22.13，执行 npm ci，然后 npm run build。按照 drizzle/ 中的�
     node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0003_futuristic_queen_noir.sql
 
     node --test tests/chat.test.mjs tests/student-tasks.test.mjs
+
+## 图片、公开讨论与个人创作
+
+- 广场和闲置支持最多 9 张图片；客户端缩放与重新编码后上传 R2，图片元数据在 D1。手机系统文件选择器提供相册与拍照入口（实际拍照依赖浏览器/设备支持）。服务器检查图片签名和 5 MB 限制，未发布图片仅上传者可查看，发布时验证图片归属。
+- 广场回复在帖子下方展开；学习交流筛选联动发布默认分类。
+- 求助支持匿名、悬赏金额（展示用途，无支付/托管）、0–5 星难度，以及悬赏/难度排序和筛选。匿名作者标识在 API 层移除，作者依靠 mine 标志管理自己的内容；作者在匿名帖的回复也匿名展示。匿名帖禁止关联实名圈子。
+- 校园圈子负责发现、介绍、加入与公开招募讨论；我的圈子详情可返回全部圈子。成员群聊与私聊统一在消息中心，公开圈子回复与私密消息分表保存。
+- 个人主页有动态时间线、想法、回答、专栏、生活记录、帖子；发布专栏归入学习交流，个人回答来源于求助回复，数据来自当前登录者。
+
+声明 R2 绑定 BUCKET。只应用尚未执行的迁移：
+
+    node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0004_clammy_apocalypse.sql
+
+完整服务端测试：
+
+    node --test tests/chat.test.mjs tests/student-tasks.test.mjs tests/social-features.test.mjs

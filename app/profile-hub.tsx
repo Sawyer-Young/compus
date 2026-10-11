@@ -1,0 +1,21 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {BookOpen,Lightbulb,NotebookPen,MessageCircle,ArrowUpRight,Camera} from 'lucide-react';
+import type {Post} from './student-board';
+import PostPhotos from './post-photos';
+type Activity={id:string;post:string;body:string;created:number;title:string;category:string};
+type Profile={name:string;school:string;bio:string};
+const tabs=['动态','想法','回答','专栏','生活记录','帖子'];
+export default function ProfileHub({profile,posts,query,onEdit,onPublish,onOpen}:{profile:Profile;posts:Post[];query:string;onEdit:()=>void;onPublish:(kind:string)=>void;onOpen:(p:Post)=>void}){
+ const [tab,setTab]=useState('动态'),[activity,setActivity]=useState<Activity[]>([]),[error,setError]=useState('');
+ const own=posts.filter(p=>p.mine),answers=activity.filter(a=>['互助问答','失物招领'].includes(a.category));
+ useEffect(()=>{let alive=true;fetch('/api/community?activity=1').then(async r=>{const d=await r.json() as Activity[]&{error?:string};if(!r.ok)throw Error(d.error);if(alive){setActivity(d);setError('')}}).catch(e=>{if(alive)setError(e.message)});return()=>{alive=false}},[posts]);
+ const timeline=[...own.map(p=>({id:'p'+p.id,time:p.created,post:p,reply:null as Activity|null})),...activity.map(a=>({id:'r'+a.id,time:a.created,post:null as Post|null,reply:a}))].sort((a,b)=>b.time-a.time);
+ const shown=own.filter(p=>(tab==='帖子'||tab==='动态'||p.content_kind===tab)&&(!query||[p.title,p.body].join(' ').includes(query)));
+ const actions=[{kind:'想法',label:'写想法',icon:Lightbulb},{kind:'专栏',label:'写专栏',icon:BookOpen},{kind:'生活记录',label:'记生活',icon:Camera}];
+ const time=(n:number)=>new Date(n).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+ const postCard=(p:Post)=><article className="profile-entry" key={p.id}><span className="category">{['校园动态','学习交流'].includes(p.category)?p.content_kind||p.category:p.category}{p.anonymous?' · 匿名发布':''}</span><button className="card-title" onClick={()=>onOpen(p)}><h3>{p.title}</h3></button><p>{p.body}</p><PostPhotos images={p.images}/><div><small>{time(p.created)} · {p.comments} 条回复</small><button onClick={()=>onOpen(p)}>查看与管理<ArrowUpRight size={14}/></button></div></article>;
+ const replyCard=(a:Activity)=>{const p=posts.find(p=>p.id===a.post);return <article className="profile-entry answer-entry" key={a.id}><span className="category">{['互助问答','失物招领'].includes(a.category)?'回答了问题':'参与了讨论'}</span><button className="card-title" disabled={!p} onClick={()=>p&&onOpen(p)}><h3>{a.title}</h3></button><p>{a.body}</p><div><small>{time(a.created)}</small>{p&&<button onClick={()=>onOpen(p)}>查看原帖<ArrowUpRight size={14}/></button>}</div></article>};
+ return <><section className="profile-cover"><span className="eyebrow">MY CAMPUS JOURNAL</span><h1>把经历写下来，<br/>把同学连接起来。</h1><NotebookPen size={60}/></section><section className="profile-identity"><span className="profile-avatar">{profile.name[0]}</span><div><h2>{profile.name}</h2><small>{profile.school}</small><p>{profile.bio||'还没有填写个人介绍，写一句话让同学认识你。'}</p></div><button onClick={onEdit}>编辑资料</button></section><div className="profile-stats"><span><strong>{own.length}</strong>发布</span><span><strong>{answers.length}</strong>回答</span><span><strong>{own.reduce((n,p)=>n+p.likes,0)}</strong>收到的赞</span></div><div className="profile-write">{actions.map(({kind,label,icon:Icon})=><button key={kind} onClick={()=>onPublish(kind)}><Icon size={19}/>{label}<ArrowUpRight size={14}/></button>)}</div><nav className="profile-tabs" aria-label="个人主页栏目">{tabs.map(t=><button key={t} className={tab===t?'selected':''} onClick={()=>setTab(t)}>{t}</button>)}</nav>{error&&<p className="form-error">{error}</p>}{tab==='动态'?timeline.filter(e=>!query||[e.post?.title,e.post?.body,e.reply?.title,e.reply?.body].join(' ').includes(query)).map(e=>e.post?postCard(e.post):replyCard(e.reply!)):tab==='回答'?answers.filter(a=>!query||[a.title,a.body].join(' ').includes(query)).map(replyCard):shown.map(postCard)}{(tab==='动态'?timeline.length===0:tab==='回答'?answers.length===0:shown.length===0)&&<div className="empty"><MessageCircle size={30}/><h3>{tab==='回答'?'你的回答，还在路上':'这里还没有'+tab}</h3><p>{tab==='回答'?'在求助大厅帮助同学，你的回答会被记录在这里。':'分享一个念头、写一篇专栏，或记录今天的小事。'}</p>{tab!=='回答'&&<button className="primary" onClick={()=>onPublish(['想法','专栏','生活记录'].includes(tab)?tab:'动态')}>开始记录</button>}</div>}</>;
+}
+
