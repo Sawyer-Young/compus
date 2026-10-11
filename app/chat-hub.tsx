@@ -8,7 +8,7 @@ type Detail={room:Room;members:Person[];messages:Message[];hasMore:boolean};
 const types=['快递代取','代购拼单','学习交流','兴趣搭子','其他'];
 const typeIcons=[Package,ShoppingBag,BookOpen,Heart,Users];
 async function api<T>(path='',data?:unknown):Promise<T>{const r=await fetch('/api/chat'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:undefined);const result=await r.json() as T&{error?:string};if(!r.ok)throw Error(result.error||'操作失败');return result}
-export default function ChatHub({mode,userId,recipient,onRecipientUsed,onUnread}:{mode:'消息中心'|'校园圈子';userId:string;recipient:Person|null;onRecipientUsed:()=>void;onUnread:(n:number)=>void}){
+export default function ChatHub({mode,userId,recipient,onRecipientUsed,onUnread,initialRoom,onRoomUsed}:{mode:'消息中心'|'校园圈子';userId:string;recipient:Person|null;onRecipientUsed:()=>void;onUnread:(n:number)=>void;initialRoom?:string|null;onRoomUsed?:()=>void}){
  const [rooms,setRooms]=useState<Room[]>([]),[circles,setCircles]=useState<Room[]>([]),[active,setActive]=useState<string|null>(null),[detail,setDetail]=useState<Detail|null>(null),[text,setText]=useState(''),[filter,setFilter]=useState('全部'),[query,setQuery]=useState(''),[people,setPeople]=useState<Person[]>([]),[peopleQuery,setPeopleQuery]=useState(''),[popup,setPopup]=useState(''),[draft,setDraft]=useState({name:'',category:'快递代取',description:''}),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[older,setOlder]=useState(false);
  const end=useRef<HTMLDivElement>(null),current=useRef<string|null>(null),olderRef=useRef(false),autoScroll=useRef(true),lastSeq=useRef(0);
  useEffect(()=>{current.current=active;setDetail(null);setOlder(false);olderRef.current=false;lastSeq.current=0;autoScroll.current=true;setText('')},[active]);
@@ -18,6 +18,7 @@ export default function ChatHub({mode,userId,recipient,onRecipientUsed,onUnread}
  useEffect(()=>{if(active)refreshRoom(active).catch(e=>{setError((e as Error).message);setDetail(null)})},[active]);
  useEffect(()=>{if(detail&&autoScroll.current){end.current?.scrollIntoView({block:'nearest'});autoScroll.current=false}},[detail]);
  useEffect(()=>{if(!recipient)return;startDM(recipient);onRecipientUsed()},[recipient]);
+ useEffect(()=>{if(!initialRoom)return;action({action:'join',room:initialRoom}).then(async r=>{if(r){setActive(initialRoom);await refresh()}onRoomUsed?.()})},[initialRoom]);
  useEffect(()=>{if(!peopleQuery.trim()){setPeople([]);return}let valid=true;const timer=setTimeout(()=>{api<Person[]>('?people='+encodeURIComponent(peopleQuery)).then(p=>{if(valid)setPeople(p)}).catch(e=>{if(valid)setNotice((e as Error).message)})},300);return()=>{valid=false;clearTimeout(timer)}},[peopleQuery]);
  async function action(data:unknown){setBusy(true);setNotice('');try{return await api<{id?:string;ok?:boolean}>('',data)}catch(e){setNotice((e as Error).message);return null}finally{setBusy(false)}}
  async function startDM(p:Person){const r=await action({action:'dm',to:p.id});if(r?.id){setActive(r.id);setPopup('');await refresh()}}

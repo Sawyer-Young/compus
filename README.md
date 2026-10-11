@@ -35,3 +35,19 @@ Node.js >=22.13，执行 npm ci，然后 npm run build。按照 drizzle/ 中的�
 消息索引迁移：
 
     node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_wandering_firelord.sql
+
+## 按学生任务组织页面
+
+- / 校园广场：合并校园动态与学习交流，用动态流交流。
+- /help 求助大厅：合并互助问答与失物招领；求助类型、相关地点、待解决 / 已解决状态。
+- /market 闲置市场：价格（0 元为免费送）、成色、交接地点，物品卡片、价格排序、在售 / 已售出。
+- /partners 找搭子：活动时间、集合地点、总人数（包含发起人），报名 / 取消、满员限制、招募状态和报名名单。
+- /circles 校园圈子、/messages 消息中心、/me 我的主页保持独立。
+
+各页面可直接访问、刷新及使用浏览器前进 / 后退。原帖子保持原分类；旧闲置和招募未填写的结构化信息显示为待沟通。发起人可以为招募 / 求助建立关联圈子，创建时包括当前报名同学。报名列表公开展示昵称，圈子消息仍只有成员可以查看。
+
+新增本地迁移（只应用尚未执行的文件）：
+
+    node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0003_futuristic_queen_noir.sql
+
+    node --test tests/chat.test.mjs tests/student-tasks.test.mjs
