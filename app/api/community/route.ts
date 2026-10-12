@@ -1,5 +1,6 @@
 import {postFeedSelection,postSchool,saveCampusProfile} from '../../../lib/school-feed.mjs';
 import {findSchool} from '../../../lib/school-directory.mjs';
+import {discoverySchool} from '../../../lib/campus-pilot.mjs';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../chatgpt-auth';
 import {validatePost} from '../../../lib/post-rules.mjs';
@@ -14,7 +15,7 @@ export async function GET(req:Request){
  const members=new URL(req.url).searchParams.get('members');
  if(members){const rows=await db.prepare('SELECT p.id,p.name,p.school FROM participants a JOIN profiles p ON p.id=a.user WHERE a.post=? ORDER BY a.created').bind(members).all();return json(rows.results)}
  if(id){const post=await db.prepare('SELECT author,anonymous FROM posts WHERE id=?').bind(id).first();const rows=await db.prepare('SELECT c.*,p.name FROM comments c JOIN profiles p ON p.id=c.author WHERE c.post=? ORDER BY c.created').bind(id).all();return json(publicReplies(rows.results,post,user?.userId))}
- const feed=postFeedSelection({school:String(profile?.school||''),mode:new URL(req.url).searchParams.get('scope')||'priority',user:user?.userId||'',board:new URL(req.url).searchParams.get('board')||''});
+ const feed=postFeedSelection({school:discoverySchool(String(profile?.school||'')),mode:new URL(req.url).searchParams.get('scope')||'priority',user:user?.userId||'',board:new URL(req.url).searchParams.get('board')||''});
  const rows=await db.prepare(`SELECT p.*,u.name,${postSchool} AS school,(SELECT COUNT(*) FROM comments c WHERE c.post=p.id) AS comments,(SELECT COUNT(*) FROM likes l WHERE l.post=p.id) AS likes, EXISTS(SELECT 1 FROM likes l WHERE l.post=p.id AND l.user=?) AS liked,(SELECT COUNT(*) FROM participants a WHERE a.post=p.id) AS participant_count,EXISTS(SELECT 1 FROM participants a WHERE a.post=p.id AND a.user=?) AS joined,(SELECT json_group_array(id) FROM photos f WHERE f.post=p.id) AS image_ids FROM posts p JOIN profiles u ON u.id=p.author ${feed.sql}`).bind(user?.userId||'',user?.userId||'',...feed.params).all();return json({user:user?{id:user.userId}:null,profile,posts:rows.results.map(row=>{const {image_ids,...p}=row;return publicPost({...p,images:JSON.parse(String(image_ids||'[]')).map((id:string)=>'/api/images/'+id)},user?.userId)})});
  }catch{return json({error:'社区暂时无法加载，请稍后重试'},503)}
 }

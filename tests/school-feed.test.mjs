@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {postFeedSelection,postSchool,schoolOrder,saveCampusProfile} from '../lib/school-feed.mjs';
 import {circleRequest} from '../lib/circle-service.mjs';
+import {discoverySchool,PILOT_SCHOOL} from '../lib/campus-pilot.mjs';
 function setup(){const sql=new DatabaseSync(':memory:');for(const file of readdirSync('drizzle').filter(n=>n.endsWith('.sql')).sort())sql.exec(readFileSync('drizzle/'+file,'utf8'));for(const [id,school] of [['a','大连医科大学'],['b','清华大学']])sql.prepare('INSERT INTO profiles(id,name,school,created) VALUES(?,?,?,?)').run(id,id,school,1);const db={prepare(query){let args=[];return {bind(...v){args=v;return this},async first(){return sql.prepare(query).get(...args)||null},async all(){return {results:sql.prepare(query).all(...args)}},async run(){return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}}}},async batch(statements){sql.exec('BEGIN');try{const out=[];for(const s of statements)out.push(await s.run());sql.exec('COMMIT');return out}catch(e){sql.exec('ROLLBACK');throw e}}};return {sql,db}}
 function add(sql,id,author,school,category,created){sql.prepare('INSERT INTO posts(id,author,school,title,body,category,created) VALUES(?,?,?,?,?,?,?)').run(id,author,school,id,'内容',category,created)}
 function feed(sql,options){const q=postFeedSelection(options);return sql.prepare(`SELECT p.id,p.author,${postSchool} AS school,p.created FROM posts p JOIN profiles u ON u.id=p.author ${q.sql}`).all(...q.params)}
@@ -33,4 +34,14 @@ test('circle discovery prioritizes local groups; mine retains joined foreign gro
  assert.deepEqual((await get('?scope=all')).map(c=>c.id),['foreign','local']);
  assert.deepEqual((await get('?scope=local')).map(c=>c.id),['local']);
  assert.deepEqual((await get('?scope=local&mine=1')).map(c=>c.id),['foreign']);
+ // Visitors get the pilot campus, but a saved foreign school still takes precedence.
+ assert.equal(discoverySchool(undefined),PILOT_SCHOOL);
+ add(sql,'pilot-post','a',PILOT_SCHOOL,'校园动态',1);add(sql,'other-post','b','清华大学','校园动态',2);
+ assert.equal(feed(sql,{school:discoverySchool(null)})[0].id,'pilot-post');
+ assert.equal(feed(sql,{school:discoverySchool('清华大学')})[0].id,'other-post');
+ const guest=async q=>await (await circleRequest(new Request('https://test/api/circles'+q),db,null)).json();
+ assert.deepEqual((await guest('')).map(c=>c.id),['local','foreign']);
+ assert.deepEqual((await guest('?scope=local')).map(c=>c.id),['local']);
+ assert.deepEqual((await guest('?scope=all')).map(c=>c.id),['foreign','local']);
+ assert.deepEqual((await (await circleRequest(new Request('https://test/api/circles'),db,'b')).json()).map(c=>c.id),['foreign','local']);
  }finally{sql.close()}});
