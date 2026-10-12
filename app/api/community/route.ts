@@ -1,3 +1,4 @@
+import {findSchool} from '../../../lib/school-directory.mjs';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../chatgpt-auth';
 import {validatePost} from '../../../lib/post-rules.mjs';
@@ -19,7 +20,7 @@ export async function POST(req:Request){
  const origin=req.headers.get('origin');if(origin&&origin!==new URL(req.url).origin)return json({error:'请求来源无效'},403);
  const user=await getChatGPTUser();if(!user)return json({error:'请先登录'},401);
  try{const raw=await req.text();if(raw.length>16000)return json({error:'内容过长'},400);const data=JSON.parse(raw);const db=env.DB!;const now=Date.now();const str=(v:unknown,max:number)=>typeof v==='string'?v.trim().slice(0,max):'';
- if(data.action==='profile'){const name=str(data.name,24),school=str(data.school,60);if(!name||!school)return json({error:'请填写昵称和学校'},400);await db.prepare('INSERT INTO profiles(id,name,school,bio,created) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,school=excluded.school,bio=excluded.bio').bind(user.userId,name,school,str(data.bio,160),now).run();return json({ok:true})}
+ if(data.action==='profile'){const name=str(data.name,24),school=str(data.school,60);if(!name||!school)return json({error:'请填写昵称并选择学校'},400);if(!findSchool(school))return json({error:'请从本科高校名单中选择学校'},400);await db.prepare('INSERT INTO profiles(id,name,school,bio,created) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,school=excluded.school,bio=excluded.bio').bind(user.userId,name,school,str(data.bio,160),now).run();return json({ok:true})}
  const profile=await db.prepare('SELECT id FROM profiles WHERE id=?').bind(user.userId).first();if(!profile)return json({error:'请先完成校园资料注册'},403);
  if(data.action==='post'){let p;try{p=validatePost(data)}catch(e){return json({error:(e as Error).message},400)}
  let imageIds:string[];try{imageIds=await validatePhotoIds(db,user.userId,data.images)}catch(e){return json({error:(e as Error).message},400)}

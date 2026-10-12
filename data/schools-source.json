@@ -1,0 +1,10 @@
+{
+  "date": "2026-06-17",
+  "count": 1412,
+  "provinces": 31,
+  "scope": "中国内地普通本科高校，含职业本科；不含港澳台、专科和成人高校",
+  "source": "https://dxs.moe.gov.cn/zx/a/sy_xzsd/260618/2045120.shtml",
+  "attachment": "https://www.moe.gov.cn/jyb_xxgk/s5743/s5744/202606/W020260618416094865984.xls",
+  "sha256": "29c40f083b639888e429cf40b68f9a75782d1ce81131c99aabca65b65b36eaea",
+  "classification": "省份使用名单中的分组，城市使用名单中的所在地；不是校区所在地。"
+}

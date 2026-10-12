@@ -67,3 +67,11 @@ Node.js >=22.13，执行 npm ci，然后 npm run build。按照 drizzle/ 中的�
 完整服务端测试：
 
     node --test tests/chat.test.mjs tests/student-tasks.test.mjs tests/social-features.test.mjs
+
+## 本科高校选择库（2026 年）
+
+`data/schools.json` 收录教育部截至 2026-06-17 的 1,412 所普通本科高校（含职业本科），按官方省份分组与所在地分类。专科、成人高校及港澳台不在这份名单中。来源、日期和原始 XLS SHA-256 记录在 `data/schools-source.json`。
+
+校园名片支持省市联动、全国关键词搜索以及学校选项；前后端均只接受官方全称。已有学校文本保留，编辑资料时需选择库中学校。名单代表一个日期的快照，不会自动更新，也不是学生身份验证。
+
+更新：下载 source 元数据中的教育部 XLS，用 Python（需 xlrd）运行 `python scripts/import-schools.py <xls路径>`，根据新名单同步 count/date/source，运行 `node --test tests/schools.test.mjs` 后发布。城市表示学校所在地，不展开校区；河北工业大学因此属于河北省分组、所在地天津市。
